@@ -8,54 +8,59 @@ import streamlit as st
 import os
 from datetime import datetime, timedelta
 
-def file_selector(ch, folder_path='.'):
-    filenames = os.listdir(folder_path+"/local_files/dbc")
-    selected_filename = st.selectbox('Select a database for %s' % ch, filenames)
-    return os.path.join(folder_path, selected_filename)
-
 def file_selector_input(folder_path='.'):
     filenames = os.listdir(folder_path+"/local_files/inputs/")
     selected_filename = st.selectbox('Select a ascii file', filenames)
     return os.path.join(folder_path, selected_filename), selected_filename
 
-
-ch1 = file_selector("channel 1")
-ch2 = file_selector("channel 2")
-ch3 = file_selector("channel 3")
-ch4 = file_selector("channel 4")
-ch5 = file_selector("channel 5")
-ch6 = file_selector("channel 6")
+def file_selector(ch, folder_path='.'):
+    filenames = os.listdir(os.path.join(folder_path, "local_files/dbc"))
+    selected_filename = st.selectbox('Select a database for %s' % ch, filenames, key=f"db_selector_{ch}", index = 0)
+    return os.path.join(folder_path, "local_files/dbc", selected_filename)
 
 error_counter = 0
+channels = []
+db = []
 
-db1 = cantools.database.load_file("local_files/dbc/"+ch1)
-db2 = cantools.database.load_file("local_files/dbc/"+ch2)
-db3 = cantools.database.load_file("local_files/dbc/"+ch3)
-db4 = cantools.database.load_file("local_files/dbc/"+ch4)
-db5 = cantools.database.load_file("local_files/dbc/"+ch5)
-db6 = cantools.database.load_file("local_files/dbc/"+ch6)
-
-db= [db1, db2, db3, db4, db5, db6]
-
-pattern = re.compile(r'^date')
-date_format = "date %a %b %d %H:%M:%S %Y"
-pattern_ch = re.compile(r'\s*1\s*')
-pattern_id = re.compile(r'      1       (\w+)')
-pattern2 = re.compile(r'([\d.]+)\s+(\d+)\s+([0-9a-fA-F]+x)\s+(\w+)\s+(\w+)\s+(\d+)\s+([0-9a-fA-F ]+)')
-
-
+channels_amount = st.number_input("How many channels to decode?", step=1, min_value=1, max_value=30, value=6)
 temp, filename=file_selector_input()
 file_path= "local_files/inputs/"+temp
 data_list = []
 
-# Open the file and read it line by line
-if st.button('Generate mdf3 file'):
+with st.form("database_selection_form"):
+    for i in range(channels_amount):
+        channels.append(file_selector(f"channel {i+1}"))
+
+    submit_button = st.form_submit_button("Submit")
+
+# Do something with the selected databases after the form is submitted
+if submit_button:
+    for i in range(len(channels)):
+        temp = (cantools.database.load_file(channels[i]))
+        db.append(temp)
+
+    
+
+    pattern = re.compile(r'^date')
+    date_format = "date %a %b %d %H:%M:%S %Y"
+    pattern_ch = re.compile(r'\s*1\s*')
+    pattern_id = re.compile(r'      1       (\w+)')
+    pattern2 = re.compile(r'([\d.]+)\s+(\d+)\s+([0-9a-fA-F]+x)\s+(\w+)\s+(\w+)\s+(\d+)\s+([0-9a-fA-F ]+)')
+    epoch = False
+    
+    progress=st.write("")
+    # Open the file and read it line by line
+    #print(db)
     with open(file_path, 'r') as file:
         for line in file:
             # Process each line as needed
             stripped_line=line.strip()  # Example: Print each line, removing leading and trailing whitespaces
             if pattern.match(stripped_line):
-                start_date = datetime.strptime(stripped_line, date_format)
+                try:
+                    start_date = datetime.strptime(stripped_line, date_format)
+                except:
+                    start_date = "no date"
+                string_start_date = stripped_line
 
             match = pattern2.match(stripped_line)
             if match:
@@ -90,14 +95,18 @@ if st.button('Generate mdf3 file'):
                     
     data_list2 = []
 
-    for i in data_list:
+    for index, i in enumerate(data_list):
 
         time_1 = i["time"]
                      
         for key, val in i.items():
             if type(val) == int or type(val) == float:
                 try:
-                    data_list2.append({'timestamp': start_date+timedelta(microseconds=int(round(float(time_1)*1000000))), 'signal_value': val, 'signal_name': key})
+                    if epoch:
+                        data_list2.append({'timestamp': int(start_date.timestamp() * 1_000_000)+int(round(float(time_1)*10000000)), 'signal_value': val, 'signal_name': key})
+                    else:
+                        data_list2.append({'timestamp': time_1, 'signal_value': val, 'signal_name': key})
+                    progress = (index,"    ",len(data_list))
                 except Exception as e:
                     print(e)
                     continue
@@ -116,9 +125,11 @@ if st.button('Generate mdf3 file'):
         # Create Signal object for each signal
         signal = Signal(samples=signal_data['values'], timestamps=signal_data['timestamps'], name=signal_name, unit='')
         # Append the Signal object to the MDF
-        mdf.append(signal, timestamp=True)
+        mdf.append(signal)
 
     # Save MDF to a file
 
-    mdf.save('local_files/outputs/Converted_ASCII_%s.dat' %filename)
+    string_start_date = string_start_date.replace(":", "-").replace(" ", "")
+    mdf.save('local_files/outputs/Converted_ASCII_%s.dat' %(filename.replace(".asc", "")+string_start_date))
+    print(error_counter)
 
