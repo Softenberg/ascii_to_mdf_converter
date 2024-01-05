@@ -86,7 +86,7 @@ if submit_button:
                     continue
                 dat_2 = {}
                 for i in dat:
-                    nam = "channel"+channel+"_"+i+"_"+str(message_id)
+                    nam = "channel"+channel+"_"+i+"_"+str(db[int(channel)-1].get_message_by_frame_id(message_id).name)
                     dat_2[nam] = dat[i]
                 dat = dat_2
                 #print(dat)
@@ -123,13 +123,13 @@ if submit_button:
     mdf = MDF(version='3.00')
     for signal_name, signal_data in data_dict.items():
         # Create Signal object for each signal
+        print(signal_name)
         signal = Signal(samples=signal_data['values'], timestamps=signal_data['timestamps'], name=signal_name, unit='')
         # Append the Signal object to the MDF
         mdf.append(signal)
 
     # Save MDF to a file
 
-    string_start_date = string_start_date.replace(":", "-").replace(" ", "")
+    string_start_date = string_start_date.replace(":", "-")
     mdf.save('local_files/outputs/Converted_ASCII_%s.dat' %(filename.replace(".asc", "")+string_start_date))
     print(error_counter)
-
