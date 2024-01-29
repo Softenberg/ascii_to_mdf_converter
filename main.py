@@ -123,7 +123,7 @@ if submit_button:
     mdf = MDF(version='3.00')
     for signal_name, signal_data in data_dict.items():
         # Create Signal object for each signal
-        print(signal_name)
+        #print(signal_name)
         signal = Signal(samples=signal_data['values'], timestamps=signal_data['timestamps'], name=signal_name, unit='')
         # Append the Signal object to the MDF
         mdf.append(signal)
